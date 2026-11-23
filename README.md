@@ -44,6 +44,12 @@ squeezed file, not from the `.ZSQ` filename.
 python3 unsqz88.py [options] FILE [FILE ...]
 ```
 
+`FILE` can be a wildcard such as `*.zsq`. The script expands wildcards
+itself, so they work on Windows (where the command prompt doesn't expand
+them) as well as on Linux and macOS. Matching ignores upper and lower case,
+so `*.zsq` picks up `APP1.ZSQ` and `app2.zsq` alike. A pattern that matches
+nothing is reported as an error.
+
 | Option | Meaning |
 |---|---|
 | `-o DIR`, `--outdir DIR` | Write output into `DIR` (created if needed). Default: current directory. |
@@ -67,8 +73,8 @@ python3 unsqz88.py --list -o restored *.ZSQ
 # Just check a batch of transfers are sound
 python3 unsqz88.py --info *.ZSQ
 
-# Windows
-py unsqz88.py -o restored APP1.ZSQ clishell.ZSQ
+# Windows: unsqueeze every .zsq file in the current folder
+py unsqz88.py -o restored *.zsq
 ```
 
 The exit status is `0` if every file decoded with a matching checksum and

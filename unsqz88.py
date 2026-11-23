@@ -16,10 +16,11 @@ run-length layer). This tool:
 Python 3.6+ standard library only.  Run with -h for usage.
 """
 import argparse
+import fnmatch
 import os
 import sys
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 SQ_MAGIC = 0x76, 0xFF
 DLE = 0x90          # run-length escape byte in the SQ format
@@ -219,8 +220,41 @@ def unique_path(path):
     return "%s.%d" % (base, n)
 
 
+def expand_wildcards(names):
+    """Expand *, ? and [...] in names, matching case-insensitively.
+
+    Needed on Windows, whose shell passes wildcards through unexpanded, and
+    handy elsewhere so that *.zsq also finds APP1.ZSQ.  Returns
+    (paths, patterns_that_matched_nothing).
+    """
+    paths, unmatched = [], []
+    for name in names:
+        if os.path.exists(name) or not any(ch in name for ch in "*?["):
+            paths.append(name)
+            continue
+        folder, pattern = os.path.split(name)
+        try:
+            entries = os.listdir(folder or ".")
+        except OSError:
+            entries = []
+        found = sorted(os.path.join(folder, e) for e in entries
+                       if fnmatch.fnmatchcase(e.lower(), pattern.lower())
+                       and os.path.isfile(os.path.join(folder or ".", e)))
+        if found:
+            paths.extend(found)
+        else:
+            unmatched.append(name)
+    seen = set()
+    return [p for p in paths if not (p in seen or seen.add(p))], unmatched
+
+
 def process(path, args):
-    data = open(path, "rb").read()
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError as e:
+        print("%s: ERROR: %s" % (path, e.strerror or e), file=sys.stderr)
+        return False
     try:
         name, stored, out = unsqueeze(data)
     except SqueezeError as e:
@@ -263,7 +297,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Unsqueeze Cambridge Z88 Squeez88 (.ZSQ) files and, with "
                     "--list, list BBC BASIC programs.")
-    ap.add_argument("files", nargs="+", help="squeezed file(s) to process")
+    ap.add_argument("files", nargs="+", help="squeezed file(s) to process; wildcards such as *.zsq are "
+                         "allowed and match regardless of upper/lower case")
     ap.add_argument("-o", "--outdir", default=".", help="output directory (default: current)")
     ap.add_argument("-i", "--info", action="store_true",
                     help="only report name, size and checksum; write nothing")
@@ -281,8 +316,11 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if not args.info:
         os.makedirs(args.outdir, exist_ok=True)
-    results = [process(f, args) for f in args.files]
-    return 0 if all(results) else 1
+    files, unmatched = expand_wildcards(args.files)
+    for pattern in unmatched:
+        print("%s: ERROR: no files match" % pattern, file=sys.stderr)
+    results = [process(f, args) for f in files]
+    return 0 if all(results) and not unmatched else 1
 
 
 if __name__ == "__main__":
