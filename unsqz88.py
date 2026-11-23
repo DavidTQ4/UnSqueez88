@@ -9,7 +9,7 @@ run-length layer). This tool:
   * decompresses one or more squeezed files,
   * verifies each result against the checksum stored in the file,
   * names the output after the original filename stored inside,
-  * optionally writes a plain-text LISTing of BBC BASIC programs,
+  * with --list, also writes a plain-text LISTing of BBC BASIC programs,
   * detects files damaged by a text-mode transfer (EazyLink / PC-Link
     ISO->IBM character translation and CR->CRLF conversion) and says so.
 
@@ -19,7 +19,7 @@ import argparse
 import os
 import sys
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 SQ_MAGIC = 0x76, 0xFF
 DLE = 0x90          # run-length escape byte in the SQ format
@@ -250,7 +250,7 @@ def process(path, args):
     with open(target, "wb") as f:
         f.write(out)
     print("    wrote %s" % target)
-    if is_basic and not args.no_list:
+    if is_basic and args.list:
         listing, end = detokenise(out, args.escape_high)
         lpath = target + ".txt"
         with open(lpath, "w", encoding="utf-8", newline="\n") as f:
@@ -261,20 +261,22 @@ def process(path, args):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(
-        description="Unsqueeze Cambridge Z88 Squeez88 (.ZSQ) files and list "
-                    "BBC BASIC programs.")
+        description="Unsqueeze Cambridge Z88 Squeez88 (.ZSQ) files and, with "
+                    "--list, list BBC BASIC programs.")
     ap.add_argument("files", nargs="+", help="squeezed file(s) to process")
     ap.add_argument("-o", "--outdir", default=".", help="output directory (default: current)")
     ap.add_argument("-i", "--info", action="store_true",
                     help="only report name, size and checksum; write nothing")
     ap.add_argument("-f", "--force", action="store_true",
                     help="write output even if the checksum does not match")
-    ap.add_argument("-n", "--no-list", action="store_true",
-                    help="do not write .txt listings for BASIC programs")
+    ap.add_argument("-l", "--list", action="store_true",
+                    help="also write a plain-text .txt listing for each BBC BASIC "
+                         "program (default: straight decompression only)")
     ap.add_argument("--overwrite", action="store_true",
                     help="overwrite existing output files instead of adding .1, .2 ...")
     ap.add_argument("--escape-high", action="store_true",
-                    help="show bytes >= 0x80 in strings as \\xNN instead of Latin-1")
+                    help="with --list, show bytes >= 0x80 in strings as \\xNN "
+                         "instead of Latin-1")
     ap.add_argument("-V", "--version", action="version", version="%(prog)s " + __version__)
     args = ap.parse_args(argv)
     if not args.info:
